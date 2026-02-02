@@ -83,6 +83,29 @@
         const chatMessages = document.getElementById("chatMessages");
         const chatInput = document.getElementById("chatInput");
 
+        function appendChatBubble({ message, isUser, isAI, time }) {
+            const timeStr = time ? new Date(time).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : '';
+
+            const row = document.createElement("div");
+            row.className = `flex mb-2 ${isUser ? "justify-end" : "justify-start"}`;
+
+            row.innerHTML = `
+        <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'}">
+            <span class="px-3 py-2 rounded text-sm
+            ${isAI ? "bg-purple-100 italic"
+                        : isUser ? "bg-green-100"
+                            : "bg-gray-200"}">
+            ${message}
+            </span>
+            <span class="text-xs text-gray-400 mt-1 px-1">${timeStr}</span>
+        </div>
+    `;
+            chatMessages.appendChild(row);
+        }
+
         document.getElementById("chatbotToggle").onclick =
             () => chatbotPanel.classList.toggle("translate-x-full");
 
@@ -125,7 +148,17 @@
             propertyTitle.textContent = data.title;
             propertyPrice.textContent = data.price;
             propertyLocation.textContent = data.location;
-            propertyDesc.textContent = data.description;
+            //propertyDesc.textContent = data.description;
+            function cleanText(text) {
+                if (!text) return text;
+                return text
+                    .replace(/â€¢/g, "•")
+                    .replace(/â€™/g, "’")
+                    .replace(/â€“/g, "–");
+            }
+
+            propertyDesc.textContent = cleanText(data.description);
+
             mainImage.src = data.main_image;
             chatbotTitle.textContent = data.title + " Chat";
 
@@ -161,6 +194,15 @@
                 const msg = chatInput.value.trim();
                 chatInput.value = "";
                 chatInput.disabled = true;
+
+                // Optimistic UI: show message immediately
+                appendChatBubble({
+                    message: msg,
+                    isUser: true,
+                    isAI: false,
+                    time: new Date().toISOString()
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
 
                 try {
                     const sendRes = await fetch(`${BASE_URL}/chat/send`, {
@@ -251,28 +293,13 @@
                     
                     const isUser = Number(msg.sender_id) === Number(USER_ID);
                     const isAI = msg.type === "ai_followup";
-                    
-                    // Format time
-                    const timeStr = msg.time ? new Date(msg.time).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }) : '';
 
-                    const row = document.createElement("div");
-                    row.className = `flex mb-2 ${isUser ? "justify-end" : "justify-start"}`;
-
-                    row.innerHTML = `
-                <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'}">
-                    <span class="px-3 py-2 rounded text-sm
-                    ${isAI ? "bg-purple-100 italic"
-                                : isUser ? "bg-green-100"
-                                    : "bg-gray-200"}">
-                    ${msg.message}
-                    </span>
-                    <span class="text-xs text-gray-400 mt-1 px-1">${timeStr}</span>
-                </div>
-            `;
-                    chatMessages.appendChild(row);
+                    appendChatBubble({
+                        message: msg.message,
+                        isUser,
+                        isAI,
+                        time: msg.time
+                    });
                 });
                 
                 chatMessages.scrollTop = chatMessages.scrollHeight;
