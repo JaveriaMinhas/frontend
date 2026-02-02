@@ -71,7 +71,8 @@
     </div>
 
     <script>
-        const BASE_URL = "http://127.0.0.1:8000";
+        const BASE_URL = "https://api.appolyse.com";
+
         const AGENT_ID = 222;
         const propertyId = new URLSearchParams(window.location.search).get("property_id");
         const openChat = new URLSearchParams(window.location.search).get("openChat");
@@ -147,7 +148,7 @@
             });
 
             loadChat();
-            setInterval(loadChat, 3000);
+            setInterval(loadChat, 5000);
 
             // Auto-open chat if coming from notification
             if (openChat === 'true') {
@@ -159,23 +160,57 @@
 
                 const msg = chatInput.value.trim();
                 chatInput.value = "";
+                chatInput.disabled = true;
 
-                await fetch(`${BASE_URL}/chat/send`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        sender_id: USER_ID,
-                        receiver_id: AGENT_ID,
-                        property_id: propertyId,
-                        message: msg
-                    })
-                });
-
-                loadChat();
+                try {
+                    const sendRes = await fetch(`${BASE_URL}/chat/send`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            sender_id: USER_ID,
+                            receiver_id: AGENT_ID,
+                            property_id: propertyId,
+                            message: msg
+                        })
+                    });
+                    
+                    if (!sendRes.ok) {
+                        throw new Error(`Failed to send message: ${sendRes.status}`);
+                    }
+                    
+                    console.log("Message sent successfully");
+                    
+                    // Wait a bit for backend to process
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Reload chat to show new message
+                    lastMessageCount = 0;
+                    await loadChat();
+                    
+                    // Trigger followup generation if endpoint exists
+                    try {
+                        await fetch(`${BASE_URL}/chat/generate-followup`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ user_id: USER_ID, property_id: propertyId })
+                        });
+                    } catch (err) {
+                        console.log("Followup endpoint not available:", err);
+                    }
+                } catch (err) {
+                    console.error("Failed to send message:", err);
+                    alert("Error sending message. Please try again.");
+                } finally {
+                    chatInput.disabled = false;
+                    chatInput.focus();
+                }
             });
         }
 
-        /* ---------- LOAD CHAT (NO STATIC FOLLOWUP) ---------- */
+        /* ---------- LOAD CHAT (OPTIMIZED) ---------- */
+        let lastMessageCount = 0;
+        let chatCache = [];
+        
         async function loadChat() {
             const res = await fetch(
                 `${BASE_URL}/chat/conversation/${USER_ID}/${AGENT_ID}/${propertyId}`
@@ -183,24 +218,40 @@
             if (!res.ok) return;
 
             const dailyChats = await res.json();
-            console.log("API Response:", dailyChats);
-            chatMessages.innerHTML = "";
-
+            
+            // Flatten all messages with their day info
+            const allMessages = [];
             dailyChats.forEach(day => {
-                console.log("Processing day:", day);
-                if (!day.messages || day.messages.length === 0) return;
-
-                const date = document.createElement("div");
-                date.className = "text-center text-gray-400 text-sm my-2";
-                date.textContent = new Date(day.conversation_date).toLocaleDateString();
-                chatMessages.appendChild(date);
-
-                day.messages.forEach(msg => {
-                    console.log("Message:", msg, "Type:", msg.type);
+                (day.messages || []).forEach(msg => {
+                    allMessages.push({ ...msg, conversation_date: day.conversation_date });
+                });
+            });
+            
+            // If no new messages, return early
+            if (allMessages.length === lastMessageCount && chatCache.length === allMessages.length) {
+                return;
+            }
+            
+            // Clear and rebuild only if we have new messages
+            if (allMessages.length > lastMessageCount) {
+                chatMessages.innerHTML = "";
+                lastMessageCount = allMessages.length;
+                chatCache = allMessages;
+                
+                let currentDate = null;
+                allMessages.forEach(msg => {
+                    // Add date separator if date changed
+                    if (msg.conversation_date !== currentDate) {
+                        currentDate = msg.conversation_date;
+                        const date = document.createElement("div");
+                        date.className = "text-center text-gray-400 text-sm my-2";
+                        date.textContent = new Date(msg.conversation_date).toLocaleDateString();
+                        chatMessages.appendChild(date);
+                    }
+                    
                     const isUser = Number(msg.sender_id) === Number(USER_ID);
                     const isAI = msg.type === "ai_followup";
-                    console.log(`isUser: ${isUser}, isAI: ${isAI}, sender_id: ${msg.sender_id}, USER_ID: ${USER_ID}`);
-
+                    
                     // Format time
                     const timeStr = msg.time ? new Date(msg.time).toLocaleTimeString('en-US', {
                         hour: '2-digit',
@@ -223,9 +274,9 @@
             `;
                     chatMessages.appendChild(row);
                 });
-            });
-
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
         }
 
         initUser();
