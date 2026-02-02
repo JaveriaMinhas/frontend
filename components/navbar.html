@@ -1,0 +1,95 @@
+<nav class="sticky top-0 z-50 bg-white shadow-md transition-shadow duration-300">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+
+        <!-- Logo -->
+        <h1
+            class="text-3xl font-bold text-green-600 tracking-tight hover:text-green-700 cursor-pointer transition-colors duration-200">
+            RealEstateAI
+        </h1>
+
+        <!-- Links -->
+        <div class="hidden md:flex space-x-8 font-medium text-gray-700 items-center">
+            <a href="index.html" data-track="nav_home"
+                class="hover:text-green-600 transition-colors duration-200">Home</a>
+            <a href="listings.html" data-track="nav_listings"
+                class="hover:text-green-600 transition-colors duration-200">Buy</a>
+            <a href="contact.html" data-track="nav_contact"
+                class="hover:text-green-600 transition-colors duration-200">Contact</a>
+            
+            <!-- Notification Bell -->
+            <div class="relative">
+                <button id="notificationBell" class="relative p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+                    <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span id="notificationBadge" class="hidden absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                </button>
+                
+                <!-- Notification Dropdown -->
+                <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto z-50">
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="font-semibold text-gray-800">New Followups</h3>
+                    </div>
+                    <div id="notificationList" class="divide-y divide-gray-100">
+                        <!-- Notifications will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Button -->
+        <a href="contact.html" data-track="nav_schedule"
+            class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105">
+            Schedule Visit
+        </a>
+
+        <!-- Mobile menu button (optional) -->
+        <div class="md:hidden">
+            <button id="mobileMenuBtn" class="text-gray-700 hover:text-green-600 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Mobile menu (hidden by default) -->
+    <div id="mobileMenu" class="hidden md:hidden bg-white shadow-lg">
+        <a href="index.html" class="block px-6 py-3 hover:bg-green-50 hover:text-green-600">Home</a>
+        <a href="listings.html" class="block px-6 py-3 hover:bg-green-50 hover:text-green-600">Buy</a>
+        <a href="contact.html" class="block px-6 py-3 hover:bg-green-50 hover:text-green-600">Contact</a>
+        <a href="contact.html"
+            class="block px-6 py-3 bg-green-600 text-white hover:bg-green-700 rounded-b-lg text-center">Schedule
+            Visit</a>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        const btn = document.getElementById("mobileMenuBtn");
+        const menu = document.getElementById("mobileMenu");
+        btn.addEventListener("click", () => {
+            menu.classList.toggle("hidden");
+        });
+
+        // Notification bell toggle
+        const notificationBell = document.getElementById("notificationBell");
+        const notificationDropdown = document.getElementById("notificationDropdown");
+        
+        if (notificationBell) {
+            notificationBell.addEventListener("click", (e) => {
+                e.stopPropagation();
+                notificationDropdown.classList.toggle("hidden");
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener("click", () => {
+                notificationDropdown.classList.add("hidden");
+            });
+
+            notificationDropdown.addEventListener("click", (e) => {
+                e.stopPropagation();
+            });
+        }
+    </script>
+</nav>

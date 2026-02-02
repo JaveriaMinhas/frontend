@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Login - RealEstateAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <div class="bg-white p-8 rounded shadow max-w-md w-full">
+        <h1 class="text-2xl font-bold mb-4">Welcome to RealEstateAI</h1>
+
+        <input type="text" id="name" placeholder="Your Name" class="border p-2 w-full rounded mb-4">
+        <input type="email" id="email" placeholder="Your Email" class="border p-2 w-full rounded mb-4">
+
+        <button id="loginBtn" class="bg-green-600 text-white px-4 py-2 rounded w-full">Login</button>
+    </div>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:8000";
+
+        document.getElementById("loginBtn").onclick = async () => {
+            const name = document.getElementById("name").value.trim();
+            const email = document.getElementById("email").value.trim();
+            if (!name || !email) return alert("Please enter name and email");
+
+            let userId, leadId;
+
+            try {
+                // Fetch all users
+                const res = await fetch(`${BASE_URL}/users`);
+                if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
+                const users = await res.json();
+
+                const existing = users.find(u => u.email === email);
+
+                if (existing) {
+                    userId = existing.id;
+                    leadId = existing.lead_id;
+                } else {
+                    // Create user
+                    const createRes = await fetch(`${BASE_URL}/users`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name, email, role: "user" })
+                    });
+                    if (!createRes.ok) throw new Error(`Failed to create user: ${createRes.status}`);
+                    const newUser = await createRes.json();
+                    userId = newUser.id;
+                    leadId = newUser.lead_id;
+                }
+
+                localStorage.setItem("user_id", userId);
+                localStorage.setItem("lead_id", leadId);
+
+                window.location.href = "index.html";
+
+            } catch (err) {
+                console.error("Login failed:", err);
+                alert("Login failed. Check console for details.");
+            }
+        };
+    </script>
+
+
+</body>
+
+</html>

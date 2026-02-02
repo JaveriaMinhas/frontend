@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Townhouses - RealEstateAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body data-page="villa_list" class="bg-gray-100">
+
+<!-- ===== NAVBAR ===== -->
+<nav class="sticky top-0 z-50 bg-white shadow-md">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-green-600">RealEstateAI</h1>
+
+        <div class="hidden md:flex space-x-8 font-medium text-gray-700 items-center">
+            <a href="index.html">Home</a>
+            <a href="listings.html">Buy</a>
+            <a href="contact.html">Contact</a>
+
+            <!-- Notification Bell -->
+            <div class="relative">
+                <button id="notificationBell"
+                    class="relative p-2 hover:bg-gray-100 rounded-full transition">
+                    <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span id="notificationBadge"
+                        class="hidden absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                </button>
+
+                <div id="notificationDropdown"
+                    class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border max-h-96 overflow-y-auto z-50">
+                    <div class="p-4 border-b">
+                        <h3 class="font-semibold text-gray-800">New Followups</h3>
+                    </div>
+                    <div id="notificationList" class="divide-y"></div>
+                </div>
+            </div>
+        </div>
+
+        <a href="contact.html"
+            class="bg-green-600 text-white px-5 py-2 rounded-lg shadow-md">
+            Schedule Visit
+        </a>
+    </div>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div id="mainContent" class="transition-all duration-300">
+
+    <!-- ===== DYNAMIC VILLA GRID ===== -->
+    <section class="max-w-7xl mx-auto p-8 bg-white shadow rounded mt-6">
+        <h2 class="text-2xl font-bold mb-6">Available Townhouses</h2>
+        <div id="villaGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="bg-gray-900 text-gray-300 mt-16">
+        <div class="max-w-7xl mx-auto p-10 text-center">
+            © 2026 RealEstateAI. All rights reserved.
+        </div>
+    </footer>
+
+</div>
+
+<!-- ===== CHATBOT PANEL (UI ONLY) ===== -->
+<div id="chatbotPanel"
+    class="fixed top-16 right-0 h-[calc(100%-4rem)] w-96 bg-white shadow-lg translate-x-full transition duration-300 flex flex-col z-40">
+
+    <div class="p-4 bg-green-600 text-white flex justify-between">
+        <div>
+            <h2 class="font-bold">RealEstateAI Assistant</h2>
+            <p class="text-sm opacity-90">Villa Chat</p>
+        </div>
+        <button id="closeChat" class="text-2xl">&times;</button>
+    </div>
+
+    <div class="flex-1 p-4 overflow-y-auto bg-gray-50">
+        <p class="text-sm text-gray-400 text-center">Start conversation with agent</p>
+    </div>
+
+    <input class="border p-3 m-2 rounded" placeholder="Type message...">
+</div>
+
+<!-- ===== JS: DYNAMIC DATA ===== -->
+<script>
+    const BASE_URL = "http://127.0.0.1:8000";
+    const villaGrid = document.getElementById("villaGrid");
+
+    function imgUrl(path) {
+        return path?.startsWith("http") ? path : BASE_URL + path;
+    }
+
+    async function loadVillas() {
+        try {
+            const res = await fetch(`${BASE_URL}/villas`);
+            const villas = await res.json();
+
+            villaGrid.innerHTML = "";
+
+            villas.forEach(v => {
+                const card = document.createElement("div");
+                card.className = "bg-gray-50 rounded shadow hover:shadow-lg transition";
+
+                card.innerHTML = `
+                    <a href="villa_detail.html?property_id=${v.property_id}"
+                       data-property-id="${v.property_id}"
+                       data-property-type="villa"
+                       data-feature-name="${v.title}">
+                        
+                        <img src="${imgUrl(v.main_image)}"
+                             class="w-full h-64 object-cover rounded-t">
+
+                        <div class="p-4">
+                            <h3 class="font-semibold text-xl">${v.title}</h3>
+                            <p class="text-green-600 font-bold">${v.price}</p>
+                            <p class="text-gray-500 text-sm">
+                                ${v.beds} Bed • ${v.baths} Bath • ${v.sqft} sqft
+                            </p>
+                        </div>
+                    </a>
+                `;
+                villaGrid.appendChild(card);
+            });
+
+        } catch (err) {
+            console.error("Failed to load villas", err);
+            villaGrid.innerHTML =
+                "<p class='text-red-500'>Failed to load properties.</p>";
+        }
+    }
+
+    loadVillas();
+</script>
+
+<!-- ===== NOTIFICATIONS ===== -->
+<script src="js/tracking.js"></script>
+<script src="js/notifications.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const bell = document.getElementById("notificationBell");
+        const dropdown = document.getElementById("notificationDropdown");
+
+        if (bell) {
+            bell.addEventListener("click", e => {
+                e.stopPropagation();
+                dropdown.classList.toggle("hidden");
+            });
+
+            document.addEventListener("click", () => {
+                dropdown.classList.add("hidden");
+            });
+
+            dropdown.addEventListener("click", e => e.stopPropagation());
+        }
+    });
+</script>
+
+</body>
+</html>

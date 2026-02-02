@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Human Agent Panel</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            padding: 30px;
+        }
+
+        .chat-wrapper {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, rgb(128, 208, 128), #1e40af);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9fafb;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message-row {
+            display: flex;
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .message-row.agent {
+            justify-content: flex-start;
+        }
+
+        .bubble {
+            padding: 10px 14px;
+            font-size: 14px;
+            line-height: 1.5;
+            border-radius: 16px;
+            max-width: 65%;
+            width: fit-content;
+        }
+
+        .bubble.user {
+            background: #dbeafe;
+            border-bottom-right-radius: 6px;
+        }
+
+        .bubble.agent {
+            background: #e5e7eb;
+            border-bottom-left-radius: 6px;
+        }
+
+        .input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+        }
+
+        .input-area button {
+            margin-left: 10px;
+            padding: 12px 22px;
+            border-radius: 12px;
+            border: none;
+            background: rgb(128, 208, 128);
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chat-wrapper">
+        <div class="chat-header">
+            <h2>👩‍💼 Human Agent Console</h2>
+            <select id="propertySelect"></select>
+        </div>
+        <div id="messages"></div>
+        <div class="input-area">
+            <input type="text" id="replyInput" placeholder="Type Here…">
+            <button onclick="sendReply()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:8000";
+        const AGENT_ID = 222;
+        let currentPropertyId = null;
+        let activeUserId = null;
+
+        // Load all properties into dropdown
+        async function loadProperties() {
+            const select = document.getElementById("propertySelect");
+            select.innerHTML = "";
+
+            const [villas, apartments, plots] = await Promise.all([
+                fetch(`${BASE_URL}/villas`).then(r => r.json()),
+                fetch(`${BASE_URL}/apartments`).then(r => r.json()),
+                fetch(`${BASE_URL}/plots`).then(r => r.json())
+            ]);
+
+            [...villas, ...apartments, ...plots].forEach(p => {
+                const o = document.createElement("option");
+                o.value = p.property_id;
+                o.textContent = p.title.includes("Villa") ? `🏡 Villa – ${p.title}`
+                    : p.title.includes("Apartment") ? `🏢 Apartment – ${p.title}`
+                        : `📐 Plot – ${p.title}`;
+                select.appendChild(o);
+            });
+
+            if (select.options.length > 0) {
+                currentPropertyId = select.value;
+                loadMessages();
+            }
+        }
+
+        document.getElementById("propertySelect").addEventListener("change", e => {
+            currentPropertyId = e.target.value;
+            loadMessages();
+        });
+
+        // Load chat messages for current property
+        async function loadMessages() {
+            if (!currentPropertyId) return;
+
+            try {
+                const res = await fetch(`${BASE_URL}/chat/property/${currentPropertyId}`);
+                if (!res.ok) return;
+
+                const messages = await res.json();
+                const container = document.getElementById("messages");
+                container.innerHTML = "";
+
+                messages.forEach(m => {
+                    const row = document.createElement("div");
+                    row.className = `message-row ${m.sender_id === AGENT_ID ? "agent" : "user"}`;
+                    const bubble = document.createElement("div");
+                    bubble.className = `bubble ${m.sender_id === AGENT_ID ? "agent" : "user"}`;
+                    bubble.textContent = m.message;
+                    row.appendChild(bubble);
+                    container.appendChild(row);
+
+                    // Set active user ID as the latest user sending a message
+                    if (m.sender_id !== AGENT_ID) activeUserId = m.sender_id;
+                });
+
+                container.scrollTop = container.scrollHeight;
+            } catch (err) {
+                console.error("Error loading messages", err);
+            }
+        }
+
+        // Send agent reply
+        async function sendReply() {
+            const input = document.getElementById("replyInput");
+            const msg = input.value.trim();
+            if (!msg || !currentPropertyId || !activeUserId) return;
+
+            try {
+                await fetch(`${BASE_URL}/chat/send`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        property_id: currentPropertyId,
+                        sender_id: AGENT_ID,
+                        receiver_id: activeUserId,  // ✅ THIS LINE FIXES 400
+                        message: msg
+                    })
+                });
+
+                input.value = "";
+                loadMessages(); // refresh after sending
+            } catch (err) {
+                console.error("Error sending message", err);
+            }
+        }
+
+
+        // Send on Enter key
+        document.getElementById("replyInput").addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                sendReply();
+            }
+        });
+
+        // Auto-refresh messages every 1s
+        setInterval(loadMessages, 1000);
+
+        loadProperties();
+    </script>
+    <script src="js/tracking.js"></script>
+</body>
+
+</html>

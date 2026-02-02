@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Villa Details - RealEstateAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body data-page="villa_detail" class="bg-gray-100">
+
+    <!-- NAVBAR -->
+    <nav class="sticky top-0 z-50 bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-green-600">RealEstateAI</h1>
+            <div class="hidden md:flex space-x-8 font-medium text-gray-700 items-center">
+                <a href="index.html">Home</a>
+                <a href="listings.html">Buy</a>
+                <a href="contact.html">Contact</a>
+                
+                <!-- Notification Bell -->
+                <div class="relative">
+                    <button id="notificationBell" class="relative p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        <span id="notificationBadge" class="hidden absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                    </button>
+                    
+                    <!-- Notification Dropdown -->
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto z-50">
+                        <div class="p-4 border-b border-gray-200">
+                            <h3 class="font-semibold text-gray-800">New Followups</h3>
+                        </div>
+                        <div id="notificationList" class="divide-y divide-gray-100">
+                            <!-- Notifications will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- PROPERTY DETAILS -->
+    <section class="max-w-6xl mx-auto p-6 bg-white mt-6 shadow rounded">
+        <img id="mainImage" class="w-full h-96 object-cover rounded mb-4">
+        <h1 id="propertyTitle" class="text-3xl font-bold"></h1>
+        <p id="propertyPrice" class="text-green-600 text-2xl"></p>
+        <p id="propertyLocation" class="text-gray-500"></p>
+        <p id="propertyDesc" class="mt-4 text-gray-700"></p>
+        <div id="propertyGallery" class="grid grid-cols-3 gap-2 mt-4"></div>
+    </section>
+
+    <!-- CHAT BUTTON -->
+    <button id="chatbotToggle"
+        class="fixed bottom-6 right-6 bg-green-600 text-white p-4 rounded-full shadow-lg">💬</button>
+
+    <!-- CHAT PANEL -->
+    <div id="chatbotPanel"
+        class="fixed top-0 right-0 h-full w-96 bg-white shadow-lg translate-x-full transition-transform duration-300 flex flex-col">
+
+        <div class="p-4 bg-green-600 text-white flex justify-between">
+            <h2 id="chatbotTitle">Villa Chat</h2>
+            <button id="closeChat">&times;</button>
+        </div>
+
+        <div id="chatMessages" class="flex-1 p-4 overflow-y-auto bg-gray-50"></div>
+
+        <input id="chatInput" class="border p-3 m-3 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+            placeholder="Type message & press Enter">
+    </div>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:8000";
+        const AGENT_ID = 222;
+        const propertyId = new URLSearchParams(window.location.search).get("property_id");
+        const openChat = new URLSearchParams(window.location.search).get("openChat");
+
+        let USER_ID;
+
+        const chatbotPanel = document.getElementById("chatbotPanel");
+        const chatMessages = document.getElementById("chatMessages");
+        const chatInput = document.getElementById("chatInput");
+
+        document.getElementById("chatbotToggle").onclick =
+            () => chatbotPanel.classList.toggle("translate-x-full");
+
+        document.getElementById("closeChat").onclick =
+            () => chatbotPanel.classList.add("translate-x-full");
+
+        /* ---------- INIT USER ---------- */
+        async function initUser() {
+            USER_ID = localStorage.getItem("user_id");
+            if (!USER_ID) {
+                const res = await fetch(`${BASE_URL}/users`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: "Guest User",
+                        email: "guest_" + Date.now() + "@guest.com",
+                        role: "user"
+                    })
+                });
+                const user = await res.json();
+                USER_ID = user.id;
+                localStorage.setItem("user_id", USER_ID);
+            }
+            startApp();
+        }
+
+        /* ---------- START APP ---------- */
+        async function startApp() {
+            const res = await fetch(`${BASE_URL}/villas/${propertyId}`);
+            const data = await res.json();
+
+            // Track this property interaction for notifications
+            let interactions = JSON.parse(localStorage.getItem("user_property_interactions") || "[]");
+            const existing = interactions.find(i => i.propertyId === propertyId);
+            if (!existing) {
+                interactions.push({ propertyId: propertyId, propertyType: 'villa' });
+                localStorage.setItem("user_property_interactions", JSON.stringify(interactions));
+            }
+
+            propertyTitle.textContent = data.title;
+            propertyPrice.textContent = data.price;
+            propertyLocation.textContent = data.location;
+            propertyDesc.textContent = data.description;
+            mainImage.src = data.main_image;
+            chatbotTitle.textContent = data.title + " Chat";
+
+            propertyGallery.innerHTML = "";
+            data.images?.split(",").forEach(img => {
+                const i = document.createElement("img");
+                i.src = img.trim();
+                i.className = "h-32 object-cover rounded";
+                propertyGallery.appendChild(i);
+            });
+
+            await fetch(`${BASE_URL}/chat/start`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sender_id: USER_ID,
+                    receiver_id: AGENT_ID,
+                    property_id: propertyId
+                })
+            });
+
+            loadChat();
+            setInterval(loadChat, 3000);
+
+            // Auto-open chat if coming from notification
+            if (openChat === 'true') {
+                chatbotPanel.classList.remove("translate-x-full");
+            }
+
+            chatInput.addEventListener("keydown", async e => {
+                if (e.key !== "Enter" || !chatInput.value.trim()) return;
+
+                const msg = chatInput.value.trim();
+                chatInput.value = "";
+
+                await fetch(`${BASE_URL}/chat/send`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sender_id: USER_ID,
+                        receiver_id: AGENT_ID,
+                        property_id: propertyId,
+                        message: msg
+                    })
+                });
+
+                loadChat();
+            });
+        }
+
+        /* ---------- LOAD CHAT (NO STATIC FOLLOWUP) ---------- */
+        async function loadChat() {
+            const res = await fetch(
+                `${BASE_URL}/chat/conversation/${USER_ID}/${AGENT_ID}/${propertyId}`
+            );
+            if (!res.ok) return;
+
+            const dailyChats = await res.json();
+            console.log("API Response:", dailyChats);
+            chatMessages.innerHTML = "";
+
+            dailyChats.forEach(day => {
+                console.log("Processing day:", day);
+                if (!day.messages || day.messages.length === 0) return;
+
+                const date = document.createElement("div");
+                date.className = "text-center text-gray-400 text-sm my-2";
+                date.textContent = new Date(day.conversation_date).toLocaleDateString();
+                chatMessages.appendChild(date);
+
+                day.messages.forEach(msg => {
+                    console.log("Message:", msg, "Type:", msg.type);
+                    const isUser = Number(msg.sender_id) === Number(USER_ID);
+                    const isAI = msg.type === "ai_followup";
+                    console.log(`isUser: ${isUser}, isAI: ${isAI}, sender_id: ${msg.sender_id}, USER_ID: ${USER_ID}`);
+
+                    // Format time
+                    const timeStr = msg.time ? new Date(msg.time).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '';
+
+                    const row = document.createElement("div");
+                    row.className = `flex mb-2 ${isUser ? "justify-end" : "justify-start"}`;
+
+                    row.innerHTML = `
+                <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'}">
+                    <span class="px-3 py-2 rounded text-sm
+                    ${isAI ? "bg-purple-100 italic"
+                                : isUser ? "bg-green-100"
+                                    : "bg-gray-200"}">
+                    ${msg.message}
+                    </span>
+                    <span class="text-xs text-gray-400 mt-1 px-1">${timeStr}</span>
+                </div>
+            `;
+                    chatMessages.appendChild(row);
+                });
+            });
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        initUser();
+    </script>
+
+    <script src="js/tracking.js"></script>
+    <script src="js/notifications.js"></script>
+    <script>
+        // Notification bell toggle
+        const notificationBell = document.getElementById("notificationBell");
+        const notificationDropdown = document.getElementById("notificationDropdown");
+        
+        if (notificationBell) {
+            notificationBell.addEventListener("click", (e) => {
+                e.stopPropagation();
+                notificationDropdown.classList.toggle("hidden");
+            });
+
+            document.addEventListener("click", () => {
+                notificationDropdown.classList.add("hidden");
+            });
+
+            notificationDropdown.addEventListener("click", (e) => {
+                e.stopPropagation();
+            });
+        }
+    </script>
+</body>
+
+</html>
